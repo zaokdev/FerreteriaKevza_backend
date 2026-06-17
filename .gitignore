@@ -1,0 +1,6 @@
+.env
+CLAUDE.md
+.claude/
+.agents/
+node_modules/
+dist

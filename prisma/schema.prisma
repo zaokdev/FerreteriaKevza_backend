@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  pendiente
+  cancelado
+  enviado
+  entregado
+}
+
+model Role {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  users User[]
+
+  @@map("role")
+}
+
+model User {
+  id                Int      @id @default(autoincrement())
+  idStripeCustomer  String?
+  username          String
+  email             String   @unique
+  password          String
+  isVerified        Boolean  @default(false)
+  isBanned          Boolean  @default(false)
+  idRole            Int
+  role              Role     @relation(fields: [idRole], references: [id])
+  orders            Order[]
+  createdAt         DateTime @default(now())
+
+  @@map("user")
+}
+
+model Category {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  products Product[]
+
+  @@map("category")
+}
+
+model Product {
+  id           Int            @id @default(autoincrement())
+  name         String
+  description  String?        @db.Text
+  stock        Int
+  precio       Decimal        @db.Decimal(10, 2)
+  isActive     Boolean        @default(true)
+  isFeatured   Boolean        @default(false)
+  idCategory   Int
+  category     Category       @relation(fields: [idCategory], references: [id])
+  images       ImageProduct[]
+  orderDetails OrderDetails[]
+
+  @@map("product")
+}
+
+model ImageProduct {
+  id        Int     @id @default(autoincrement())
+  idProduct Int
+  product   Product @relation(fields: [idProduct], references: [id])
+  imagePath String
+  orden     Int
+
+  @@map("image_product")
+}
+
+model Order {
+  id               Int            @id @default(autoincrement())
+  idUser           Int
+  user             User           @relation(fields: [idUser], references: [id])
+  total            Decimal        @db.Decimal(10, 2)
+  status           OrderStatus    @default(pendiente)
+  stripeSessionId  String?
+  stripePaymentId  String?
+  stripeStatus     String?
+  emailSent        Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+  orderDetails     OrderDetails[]
+
+  @@map("order")
+}
+
+model OrderDetails {
+  id        Int     @id @default(autoincrement())
+  idOrder   Int
+  order     Order   @relation(fields: [idOrder], references: [id])
+  idProduct Int
+  product   Product @relation(fields: [idProduct], references: [id])
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+
+  @@map("order_details")
+}
