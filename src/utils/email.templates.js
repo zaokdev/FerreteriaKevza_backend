@@ -32,6 +32,16 @@ export const orderStatusChanged = ({ order, newStatus }) => ({
   `,
 });
 
+export const emailVerificationEmail = ({ verifyUrl }) => ({
+  subject: "Confirma tu cuenta — Ferretería Kevza",
+  html: `
+    <h2>Confirma tu correo electrónico</h2>
+    <p>Gracias por registrarte. Haz clic en el siguiente enlace para activar tu cuenta. Este enlace expira en <strong>24 horas</strong>.</p>
+    <p><a href="${verifyUrl}" style="background:#e63946;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;">Confirmar cuenta</a></p>
+    <p>Si no creaste esta cuenta, ignora este correo.</p>
+  `,
+});
+
 export const passwordResetEmail = ({ resetUrl }) => ({
   subject: "Restablecer contraseña — Ferretería Kevza",
   html: `

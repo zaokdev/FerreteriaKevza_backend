@@ -2,7 +2,6 @@ import asyncHandler from "express-async-handler";
 import { authService } from "../services/auth.service.js";
 import {
   ok,
-  created,
   noContent,
   unauthorizedException,
   badRequestException,
@@ -12,24 +11,34 @@ export const register = asyncHandler(async (req, res) => {
   const { username, email, password } = req.body;
 
   if (!username || !email || !password) {
-    return res.status(400).json({ message: "username, email y password son requeridos" });
+    return badRequestException(res, "username, email y password son requeridos");
   }
 
-  const userData = await authService.register({ username, email, password });
+  await authService.register({ username, email, password });
+  return ok(res, { message: "Revisa tu correo para confirmar tu cuenta" });
+});
 
-  req.session.userId = userData.id;
-  req.session.username = userData.username;
-  req.session.email = userData.email;
-  req.session.rol = userData.rol;
+export const verifyEmail = asyncHandler(async (req, res) => {
+  const { token } = req.query;
+  if (!token) return badRequestException(res, "Token requerido");
 
-  return created(res, { user: userData });
+  await authService.verifyEmail({ token });
+  return ok(res, { message: "Correo verificado. Ya puedes iniciar sesión." });
+});
+
+export const resendVerification = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) return badRequestException(res, "El email es requerido");
+
+  await authService.resendVerification({ email });
+  return ok(res, { message: "Si tienes una verificación pendiente recibirás un nuevo correo" });
 });
 
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ message: "email y password son requeridos" });
+    return badRequestException(res, "email y password son requeridos");
   }
 
   const userData = await authService.login({ email, password });
@@ -69,7 +78,6 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   if (!email) return badRequestException(res, "El email es requerido");
 
   await authService.forgotPassword({ email });
-  // Siempre 200 aunque el email no exista
   return ok(res, { message: "Si el correo está registrado recibirás un enlace para restablecer tu contraseña" });
 });
 

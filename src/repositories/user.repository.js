@@ -26,9 +26,9 @@ export const userRepository = {
     ]);
   },
 
-  create({ username, email, password, idRole }) {
+  create({ username, email, password, idRole, isVerified = false }) {
     return prisma.user.create({
-      data: { username, email, password, idRole },
+      data: { username, email, password, idRole, isVerified },
       select: userSelect,
     });
   },
