@@ -24,6 +24,11 @@ export const conflictException = (
 export const unprocessableException = (res, message = "Datos inválidos") =>
   res.status(422).json({ message });
 
+export const tooManyRequestsException = (
+  res,
+  message = "Demasiadas solicitudes, intenta más tarde",
+) => res.status(429).json({ message });
+
 export const internalException = (
   res,
   err,

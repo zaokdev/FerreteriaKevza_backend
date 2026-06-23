@@ -5,6 +5,8 @@ import morgan from "morgan";
 import { sessionMiddleware } from "./config/session.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import { handleStripeWebhook } from "./controllers/checkout.controller.js";
+import { rateLimit } from "./middlewares/rateLimit.js";
+import { globalLimiter } from "./config/rateLimit.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { categoryRouter } from "./routes/category.routes.js";
 import { productRouter } from "./routes/product.routes.js";
@@ -15,6 +17,10 @@ import { userRouter } from "./routes/user.routes.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Detrás de un proxy (Render, Railway, Nginx) la IP del cliente llega en X-Forwarded-For.
+// Sin esto, req.ip sería la del proxy y el rate limiting agruparía a TODOS bajo una sola IP.
+app.set("trust proxy", 1);
 
 app.use(morgan("dev"));
 
@@ -33,6 +39,10 @@ app.use(express.json());
 app.use(sessionMiddleware);
 
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
+
+// Rate limit global — red de seguridad para toda la API.
+// Va DESPUÉS de /api/health (queda excluido) y del webhook de Stripe (está fuera de /api).
+app.use("/api", rateLimit(globalLimiter));
 
 app.use("/api/auth", authRouter);
 app.use("/api/categories", categoryRouter);

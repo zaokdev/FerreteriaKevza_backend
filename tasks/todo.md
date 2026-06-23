@@ -1,7 +1,91 @@
 # Tareas pendientes — Ferretería Kevza
 
 > Última actualización: 2026-06-20
-> Backend: 100% completo. Frontend: ~70% completo.
+> Backend: API completa — falta rate limiting (tarea actual). Frontend: ~70% completo.
+
+---
+
+## 🔒 Tarea actual: Rate Limiting (backend)
+
+**Objetivo:** proteger la API contra abuso (fuerza bruta en login, bombardeo de
+correos en forgot-password/resend, spam de checkout) usando `@upstash/ratelimit`
+con algoritmo **sliding window**, coherente con el Redis (Upstash) ya en uso.
+
+### Diseño por capas
+
+| Limitador           | Endpoints                                | Límite       | Key (identificador)  | Protege contra                       |
+| ------------------- | ---------------------------------------- | ------------ | -------------------- | ------------------------------------ |
+| `globalLimiter`     | todo `/api/*` (excepto health y webhook) | 100 / 1 min  | `req.ip`             | abuso general                        |
+| `credentialLimiter` | `login`, `reset-password`                | 10 / 15 min  | `req.ip`             | fuerza bruta (con margen para typos) |
+| `registerLimiter`   | `register`                               | 5 / 1 h      | `req.ip`             | cuentas falsas + spam de correo      |
+| `emailLimiter`      | `forgot-password`, `resend-verification` | 3 / 1 h      | `req.body.email`     | bombardeo de inbox a una víctima     |
+| `checkoutLimiter`   | `POST /checkout`                         | 10 / 1 min   | `req.session.userId` | spam de sesiones Stripe              |
+
+> Todos usan algoritmo **sliding window**.
+> El webhook de Stripe (`/webhook/stripe`) **nunca** se rate-limita — está fuera de `/api` y lo llama Stripe, no un cliente.
+> `forgot-password` y `resend-verification` se protegen con `emailLimiter` (por email, frena el bombardeo a una víctima) + el `globalLimiter` por IP que ya cubre el volumen del atacante. No necesitan limitador de IP propio: `forgotPassword` ignora emails no registrados, así que solo se puede enviar a correos reales.
+> `login`, `register` y `reset-password` van en limitadores **separados** (contadores independientes): protegen amenazas distintas y necesitan ventanas distintas.
+
+### Paso 1 — Dependencia
+
+- [x] `npm install @upstash/ratelimit` (en `backend/`). `@upstash/redis` ya está instalado.
+
+### Paso 2 — Helper HTTP 429
+
+**Archivo a modificar:** `src/utils/httpResponse.js`
+
+- [x] Agregar `tooManyRequestsException(res, message = "Demasiadas solicitudes, intenta más tarde")` → status 429
+- [ ] Agregarlo a la tabla de referencia rápida del CLAUDE.md del backend (doc) — pendiente
+
+### Paso 3 — Configuración de limitadores
+
+**Archivo a crear:** `src/config/rateLimit.js`
+
+- [x] Crear cliente Redis dedicado (`new Redis({ url, token })`, **sin** `automaticDeserialization: false`)
+- [x] Exportar `globalLimiter` (100/1m), `credentialLimiter` (10/15m), `registerLimiter` (5/1h), `emailLimiter` (3/1h), `checkoutLimiter` (10/1m) con `Ratelimit.slidingWindow(...)`
+- [x] Activar `ephemeralCache` (caché en RAM de IPs ya bloqueadas → menos llamadas a Upstash)
+- [x] Configurar `timeout` (fail-open: si Upstash no responde, deja pasar — no tumbar la tienda)
+- [x] `prefix` distinto por limitador (`rl:global`, `rl:cred`, `rl:register`, `rl:email`, `rl:checkout`)
+
+### Paso 4 — Middleware factory
+
+**Archivo a crear:** `src/middlewares/rateLimit.js`
+
+- [x] `rateLimit(limiter, getKey = (req) => req.ip)` → middleware async
+- [x] Setear headers `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+- [x] Si `!success` → `tooManyRequestsException(res)` (y header `Retry-After` desde `reset`)
+- [x] Si `getKey` devuelve `undefined`/vacío → fallback a `req.ip` (evita agrupar a todos bajo una key vacía)
+
+### Paso 5 — Aplicar en rutas
+
+**`src/index.js`**
+- [x] `app.set("trust proxy", 1)` (solo así `req.ip` es la real detrás de proxy en producción)
+- [x] `app.use("/api", rateLimit(globalLimiter))` — **después** del registro de `/api/health`, antes de los routers
+
+**`src/routes/auth.routes.js`**
+- [x] `login`, `reset-password` → `rateLimit(credentialLimiter)`
+- [x] `register` → `rateLimit(registerLimiter)`
+- [x] `forgot-password`, `resend-verification` → `rateLimit(emailLimiter, (req) => req.body.email)`
+
+**`src/routes/checkout.routes.js`**
+- [x] `POST /` → `rateLimit(checkoutLimiter, (req) => req.session.userId)` (después de `requireAuth`)
+
+### Paso 6 — Verificación (a cargo del usuario)
+
+> Código compila (`node --check` OK en los 6 archivos). El testeo en runtime lo hace el usuario.
+
+- [ ] `npm run dev` arranca sin errores
+- [ ] Login: 11 intentos rápidos con misma IP → el 11º devuelve **429** + headers correctos (límite 10/15m)
+- [ ] `/api/health` NO se ve afectado por el límite global
+- [ ] Webhook de Stripe sigue respondiendo (no rate-limitado)
+- [ ] Un request normal devuelve `X-RateLimit-Remaining` decreciente
+- [ ] Confirmar que con Upstash caído (simular timeout) la API hace fail-open, no se cuelga
+
+### Notas
+
+- No se añaden variables de entorno nuevas (reusa `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`).
+- `analytics: true` es opcional (dashboard de Upstash) — dejarlo apagado para no gastar comandos extra salvo que se quiera mostrar en el portafolio.
+- Documentar la nueva arquitectura de rate limiting en `backend/CLAUDE.md` al terminar.
 
 ---
 
@@ -10,6 +94,7 @@
 | Área | Estado |
 |------|--------|
 | Backend (API, rutas, DB, Redis, Stripe, email) | ✅ Completo |
+| Backend — rate limiting | ⏳ En progreso (tarea actual) |
 | Frontend — tienda del cliente | ✅ Completo |
 | Frontend — auth (login, register, verify, forgot/reset password) | ✅ Completo |
 | Frontend — admin dashboard | ✅ Completo |
