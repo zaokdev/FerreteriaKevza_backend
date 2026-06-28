@@ -1,6 +1,7 @@
 import asyncHandler from "express-async-handler";
 import { productService } from "../services/product.service.js";
-import { ok, created, noContent, badRequestException } from "../utils/httpResponse.js";
+import { ok, created, noContent, badRequestException, unprocessableException } from "../utils/httpResponse.js";
+import { createProductSchema, updateProductSchema } from "../validations/product.validation.js";
 
 export const getProducts = asyncHandler(async (req, res) => {
   const result = await productService.getAll(req.query);
@@ -36,13 +37,21 @@ export const getAdminProducts = asyncHandler(async (req, res) => {
 });
 
 export const createProduct = asyncHandler(async (req, res) => {
-  const product = await productService.create(req.body);
+  const result = createProductSchema.safeParse(req.body);
+  if (!result.success) {
+    return unprocessableException(res, result.error.errors[0].message);
+  }
+  const product = await productService.create(result.data);
   return created(res, { product });
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {
   const id = parseInt(req.params.id);
-  const product = await productService.update(id, req.body);
+  const result = updateProductSchema.safeParse(req.body);
+  if (!result.success) {
+    return unprocessableException(res, result.error.errors[0].message);
+  }
+  const product = await productService.update(id, result.data);
   return ok(res, { product });
 });
 

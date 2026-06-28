@@ -4,7 +4,8 @@ import { getPagination, paginatedResponse } from "../utils/pagination.js";
 export const userService = {
   async getAll(query) {
     const { page, limit, skip } = getPagination(query);
-    const [users, total] = await userRepository.findAll({ skip, limit });
+    const search = query.search?.trim() || undefined;
+    const [users, total] = await userRepository.findAll({ skip, limit, search });
     return paginatedResponse(users, total, page, limit);
   },
 

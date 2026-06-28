@@ -21,16 +21,18 @@ const orderWithRelations = {
 };
 
 export const orderRepository = {
-  findAll({ skip, limit }) {
+  findAll({ skip, limit, status }) {
+    // status es opcional — si viene, filtra por estado además del pago confirmado
+    const where = { stripeStatus: "paid", ...(status && { status }) };
     return Promise.all([
       prisma.order.findMany({
-        where: { stripeStatus: "paid" },
+        where,
         skip,
         take: limit,
         select: orderWithRelations,
         orderBy: { createdAt: "desc" },
       }),
-      prisma.order.count({ where: { stripeStatus: "paid" } }),
+      prisma.order.count({ where }),
     ]);
   },
 
@@ -82,16 +84,18 @@ export const orderRepository = {
     return prisma.order.update({ where: { id }, data: { emailSent: true } });
   },
 
-  findByUser(userId, { skip, limit }) {
+  findByUser(userId, { skip, limit, status }) {
+    // status es opcional — mismo where para findMany y count
+    const where = { idUser: userId, stripeStatus: "paid", ...(status && { status }) };
     return Promise.all([
       prisma.order.findMany({
-        where: { idUser: userId, stripeStatus: "paid" },
+        where,
         skip,
         take: limit,
         select: orderWithRelations,
         orderBy: { createdAt: "desc" },
       }),
-      prisma.order.count({ where: { idUser: userId, stripeStatus: "paid" } }),
+      prisma.order.count({ where }),
     ]);
   },
 

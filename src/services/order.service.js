@@ -3,10 +3,14 @@ import { orderRepository } from "../repositories/order.repository.js";
 import { getPagination, paginatedResponse } from "../utils/pagination.js";
 import { orderStatusChanged } from "../utils/email.templates.js";
 
+const VALID_STATUSES = ["pendiente", "cancelado", "enviado", "entregado"];
+
 export const orderService = {
   async getAll(query) {
     const { page, limit, skip } = getPagination(query);
-    const [orders, total] = await orderRepository.findAll({ skip, limit });
+    // Solo se aplica el filtro si el estado es válido; cualquier otro valor se ignora
+    const status = VALID_STATUSES.includes(query.status) ? query.status : undefined;
+    const [orders, total] = await orderRepository.findAll({ skip, limit, status });
     return paginatedResponse(orders, total, page, limit);
   },
 
@@ -28,14 +32,14 @@ export const orderService = {
 
   async getByUserAdmin(userId, query) {
     const { page, limit, skip } = getPagination(query);
-    const [orders, total] = await orderRepository.findByUser(userId, { skip, limit });
+    const status = VALID_STATUSES.includes(query.status) ? query.status : undefined;
+    const [orders, total] = await orderRepository.findByUser(userId, { skip, limit, status });
     return paginatedResponse(orders, total, page, limit);
   },
 
   async updateStatus(id, status) {
-    const validStatuses = ["pendiente", "cancelado", "enviado", "entregado"];
-    if (!validStatuses.includes(status)) {
-      const error = new Error(`Estado inválido. Valores permitidos: ${validStatuses.join(", ")}`);
+    if (!VALID_STATUSES.includes(status)) {
+      const error = new Error(`Estado inválido. Valores permitidos: ${VALID_STATUSES.join(", ")}`);
       error.status = 400;
       throw error;
     }

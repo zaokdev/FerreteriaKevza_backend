@@ -19,10 +19,26 @@ export const userRepository = {
     return prisma.user.findUnique({ where: { id }, select: userSelect });
   },
 
-  findAll({ skip, limit }) {
+  findAll({ skip, limit, search }) {
+    // Búsqueda por nombre de usuario o correo — case-insensitive por la collation de MySQL
+    const where = search
+      ? {
+          OR: [
+            { username: { contains: search } },
+            { email: { contains: search } },
+          ],
+        }
+      : undefined;
+
     return Promise.all([
-      prisma.user.findMany({ skip, take: limit, select: userSelect, orderBy: { createdAt: "desc" } }),
-      prisma.user.count(),
+      prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        select: userSelect,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.user.count({ where }),
     ]);
   },
 
