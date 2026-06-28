@@ -41,7 +41,7 @@ export const login = asyncHandler(async (req, res) => {
     return badRequestException(res, "email y password son requeridos");
   }
 
-  const userData = await authService.login({ email, password });
+  const userData = await authService.login({ email, password, ip: req.ip });
 
   req.session.userId = userData.id;
   req.session.username = userData.username;

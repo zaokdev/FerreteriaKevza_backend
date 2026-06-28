@@ -1,5 +1,7 @@
+import { logger } from "../config/logger.js";
+
 export const errorHandler = (err, req, res, next) => {
-  console.error(err.stack);
+  logger.error(`${req.method} ${req.path} — ${err.message}\n${err.stack}`);
   const status = err.status || 500;
   const message = err.message || "Error interno del servidor";
 

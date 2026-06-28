@@ -5,6 +5,7 @@ import { roleRepository } from "../repositories/role.repository.js";
 import { cache } from "../config/redis.js";
 import { transporter } from "../config/mailer.js";
 import { passwordResetEmail, emailVerificationEmail } from "../utils/email.templates.js";
+import { logger } from "../config/logger.js";
 
 const RESET_TTL = 60 * 15; // 15 minutos
 const VERIFY_TTL = 60 * 60 * 24; // 24 horas
@@ -94,9 +95,10 @@ export const authService = {
     await transporter.sendMail({ to: email, subject, html });
   },
 
-  async login({ email, password }) {
+  async login({ email, password, ip }) {
     const user = await userRepository.findByEmail(email);
     if (!user) {
+      logger.warn(`Login fallido — email no encontrado: ${email} | ip: ${ip}`);
       const error = new Error("Credenciales incorrectas");
       error.status = 401;
       throw error;
@@ -104,24 +106,29 @@ export const authService = {
 
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
+      logger.warn(`Login fallido — password incorrecto: userId=${user.id} email=${email} | ip: ${ip}`);
       const error = new Error("Credenciales incorrectas");
       error.status = 401;
       throw error;
     }
 
     if (!user.isVerified) {
+      logger.warn(`Login fallido — email no verificado: userId=${user.id} email=${email} | ip: ${ip}`);
       const error = new Error("Debes verificar tu email antes de iniciar sesión");
       error.status = 403;
       throw error;
     }
 
     if (user.isBanned) {
+      logger.warn(`Login fallido — cuenta suspendida: userId=${user.id} email=${email} | ip: ${ip}`);
       const error = new Error("Cuenta suspendida");
       error.status = 403;
       throw error;
     }
 
     const roleRecord = await roleRepository.findById(user.idRole);
+
+    logger.info(`Login exitoso: userId=${user.id} email=${email} rol=${roleRecord.name} | ip: ${ip}`);
 
     return {
       id: user.id,
