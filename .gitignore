@@ -1,6 +1,18 @@
+# Entorno
 .env
+
+# Dependencias y build
+node_modules/
+dist/
+
+# Claude AI — instrucciones internas
 CLAUDE.md
 .claude/
 .agents/
-node_modules/
-dist
+
+# Archivos de trabajo interno
+tasks/
+
+# Scripts de un solo uso
+prisma/seed.js
+prisma/update-descriptions.js
