@@ -10,7 +10,10 @@ const productWithRelations = {
   isFeatured: true,
   idCategory: true,
   category: { select: { id: true, name: true } },
-  images: { select: { id: true, imagePath: true, orden: true }, orderBy: { orden: "asc" } },
+  images: {
+    select: { id: true, imagePath: true, orden: true },
+    orderBy: { orden: "asc" },
+  },
 };
 
 export const productRepository = {
@@ -21,7 +24,7 @@ export const productRepository = {
         skip,
         take: limit,
         select: productWithRelations,
-        orderBy: { id: "desc" },
+        orderBy: { id: "asc" },
       }),
       prisma.product.count({ where: { isActive: true } }),
     ]);
@@ -39,7 +42,7 @@ export const productRepository = {
         skip,
         take: limit,
         select: productWithRelations,
-        orderBy: { id: "desc" },
+        orderBy: { id: "asc" },
       }),
       prisma.product.count({ where }),
     ]);
@@ -54,7 +57,10 @@ export const productRepository = {
   },
 
   findById(id) {
-    return prisma.product.findUnique({ where: { id }, select: productWithRelations });
+    return prisma.product.findUnique({
+      where: { id },
+      select: productWithRelations,
+    });
   },
 
   // Datos mínimos para validar stock — evita traer category e images
@@ -74,7 +80,11 @@ export const productRepository = {
         name: true,
         precio: true,
         stock: true,
-        images: { select: { imagePath: true }, orderBy: { orden: "asc" }, take: 1 },
+        images: {
+          select: { imagePath: true },
+          orderBy: { orden: "asc" },
+          take: 1,
+        },
       },
     });
   },
@@ -107,7 +117,12 @@ export const productRepository = {
     if (inStock) where.stock = { gt: 0 };
 
     return Promise.all([
-      prisma.product.findMany({ where, skip, take: limit, select: productWithRelations }),
+      prisma.product.findMany({
+        where,
+        skip,
+        take: limit,
+        select: productWithRelations,
+      }),
       prisma.product.count({ where }),
     ]);
   },
@@ -121,7 +136,12 @@ export const productRepository = {
         idCategory,
         isFeatured: isFeatured ?? false,
         images: images?.length
-          ? { create: images.map((imagePath, index) => ({ imagePath, orden: index })) }
+          ? {
+              create: images.map((imagePath, index) => ({
+                imagePath,
+                orden: index,
+              })),
+            }
           : undefined,
       },
       select: productWithRelations,
@@ -137,7 +157,11 @@ export const productRepository = {
     if (isFeatured !== undefined) data.isFeatured = isFeatured;
     if (isActive !== undefined) data.isActive = isActive;
 
-    return prisma.product.update({ where: { id }, data, select: productWithRelations });
+    return prisma.product.update({
+      where: { id },
+      data,
+      select: productWithRelations,
+    });
   },
 
   delete(id) {
@@ -170,7 +194,9 @@ export const productRepository = {
 
   createImages(productId, images) {
     // images: [{ imagePath, orden }]
-    return prisma.imageProduct.createMany({ data: images.map((img) => ({ ...img, idProduct: productId })) });
+    return prisma.imageProduct.createMany({
+      data: images.map((img) => ({ ...img, idProduct: productId })),
+    });
   },
 
   deleteImage(imageId) {
