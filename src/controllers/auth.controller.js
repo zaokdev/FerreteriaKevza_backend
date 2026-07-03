@@ -1,5 +1,6 @@
 import asyncHandler from "express-async-handler";
 import { authService } from "../services/auth.service.js";
+import { sessionCookieOptions } from "../config/session.js";
 import {
   ok,
   noContent,
@@ -55,7 +56,7 @@ export const logout = asyncHandler(async (req, res) => {
   await new Promise((resolve, reject) => {
     req.session.destroy((err) => (err ? reject(err) : resolve()));
   });
-  res.clearCookie("connect.sid");
+  res.clearCookie("connect.sid", sessionCookieOptions);
   return noContent(res);
 });
 
