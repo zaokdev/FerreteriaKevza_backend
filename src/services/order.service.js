@@ -1,4 +1,5 @@
 import { transporter } from "../config/mailer.js";
+import { logger } from "../config/logger.js";
 import { orderRepository } from "../repositories/order.repository.js";
 import { getPagination, paginatedResponse } from "../utils/pagination.js";
 import { orderStatusChanged } from "../utils/email.templates.js";
@@ -53,13 +54,21 @@ export const orderService = {
 
     const updated = await orderRepository.updateStatus(id, status);
 
-    // Enviar correo de cambio de estado al cliente
-    const template = orderStatusChanged({ order: updated, newStatus: status });
-    await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: updated.user.email,
-      ...template,
-    });
+    // Enviar correo de cambio de estado al cliente.
+    // El estado ya quedó guardado: si Gmail falla, se registra y se devuelve la orden igual —
+    // no tiene sentido responder 500 por un cambio que sí se aplicó.
+    try {
+      const template = orderStatusChanged({ order: updated, newStatus: status });
+      await transporter.sendMail({
+        from: process.env.GMAIL_USER,
+        to: updated.user.email,
+        ...template,
+      });
+    } catch (error) {
+      logger.error(
+        `Fallo al enviar el correo de cambio de estado de la orden ${id} — ${error.message}`,
+      );
+    }
 
     return updated;
   },
