@@ -1,4 +1,4 @@
-import { transporter } from "../config/mailer.js";
+import { sendMail } from "../config/mailer.js";
 import { logger } from "../config/logger.js";
 import { orderRepository } from "../repositories/order.repository.js";
 import { getPagination, paginatedResponse } from "../utils/pagination.js";
@@ -59,11 +59,7 @@ export const orderService = {
     // no tiene sentido responder 500 por un cambio que sí se aplicó.
     try {
       const template = orderStatusChanged({ order: updated, newStatus: status });
-      await transporter.sendMail({
-        from: process.env.GMAIL_USER,
-        to: updated.user.email,
-        ...template,
-      });
+      await sendMail({ to: updated.user.email, ...template });
     } catch (error) {
       logger.error(
         `Fallo al enviar el correo de cambio de estado de la orden ${id} — ${error.message}`,

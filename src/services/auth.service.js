@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { userRepository } from "../repositories/user.repository.js";
 import { roleRepository } from "../repositories/role.repository.js";
 import { cache } from "../config/redis.js";
-import { transporter } from "../config/mailer.js";
+import { sendMail } from "../config/mailer.js";
 import { passwordResetEmail, emailVerificationEmail } from "../utils/email.templates.js";
 import { logger } from "../config/logger.js";
 
@@ -43,7 +43,7 @@ export const authService = {
 
     const verifyUrl = `${process.env.CLIENT_URL}/verify-email?token=${token}`;
     const { subject, html } = emailVerificationEmail({ verifyUrl });
-    await transporter.sendMail({ to: email, subject, html });
+    await sendMail({ to: email, subject, html });
   },
 
   async verifyEmail({ token }) {
@@ -92,7 +92,7 @@ export const authService = {
 
     const verifyUrl = `${process.env.CLIENT_URL}/verify-email?token=${newToken}`;
     const { subject, html } = emailVerificationEmail({ verifyUrl });
-    await transporter.sendMail({ to: email, subject, html });
+    await sendMail({ to: email, subject, html });
   },
 
   async login({ email, password, ip }) {
@@ -149,7 +149,7 @@ export const authService = {
     const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
     const { subject, html } = passwordResetEmail({ resetUrl });
 
-    await transporter.sendMail({ to: email, subject, html });
+    await sendMail({ to: email, subject, html });
   },
 
   async resetPassword({ token, password }) {

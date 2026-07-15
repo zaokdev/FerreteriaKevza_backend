@@ -1,33 +1,33 @@
-import nodemailer from "nodemailer";
-import { lookup } from "node:dns/promises";
+const BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
+const SENDER_NAME = "Ferretería Kevza";
 
-const SMTP_HOST = "smtp.gmail.com";
-const SMTP_PORT = 587;
+// Render bloquea los puertos SMTP salientes (25/465/587) como política antispam, así que
+// Gmail por SMTP es inalcanzable desde producción por más que el código sea correcto.
+// Brevo envía por HTTPS (puerto 443), que nunca está bloqueado. El remitente sigue siendo la
+// misma cuenta de Gmail, verificada en Brevo como sender (MAIL_FROM).
+//
+// Único punto de envío de correos — el remitente se inyecta acá, no en cada llamada.
+export async function sendMail({ to, subject, html }) {
+  const response = await fetch(BREVO_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "api-key": process.env.BREVO_API_KEY,
+      "content-type": "application/json",
+      accept: "application/json",
+    },
+    body: JSON.stringify({
+      sender: { email: process.env.MAIL_FROM, name: SENDER_NAME },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+    }),
+    // Fallar rápido: nunca dejar colgado un webhook esperando al proveedor de correo
+    signal: AbortSignal.timeout(10000),
+  });
 
-// Nodemailer resuelve el host por su cuenta y elige AL AZAR entre las direcciones A (IPv4) y
-// AAAA (IPv6) que devuelve el DNS. El contenedor de producción levanta interfaz IPv6 pero no
-// tiene ruta de salida, así que cuando el sorteo caía en una AAAA la conexión moría con
-// ENETUNREACH (en local nunca pasa: sin interfaz IPv6, nodemailer ni consulta los AAAA).
-// Le pasamos la IPv4 ya resuelta; servername es obligatorio porque el host ahora es una IP y
-// el certificado TLS debe validarse contra el nombre, no contra la dirección.
-// No usar service: "gmail" — su preset se aplica al final del merge y pisa host y port.
-const { address: ipv4Address } = await lookup(SMTP_HOST, { family: 4 });
+  if (!response.ok) {
+    throw new Error(`Brevo respondió ${response.status} — ${await response.text()}`);
+  }
 
-const transporter = nodemailer.createTransport({
-  host: ipv4Address,
-  port: SMTP_PORT,
-  servername: SMTP_HOST,
-  requireTLS: true, // el puerto 587 negocia TLS con STARTTLS — nunca enviar en claro
-
-  // Sin estos límites, una red caída tarda 2 minutos en fallar y Stripe corta el webhook a los 20 s
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 20000,
-
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
-});
-
-export { transporter };
+  return response.json();
+}

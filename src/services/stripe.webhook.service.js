@@ -2,7 +2,7 @@ import { stripe } from "../config/stripe.js";
 import { cache } from "../config/redis.js";
 import { orderRepository } from "../repositories/order.repository.js";
 import { productRepository } from "../repositories/product.repository.js";
-import { transporter } from "../config/mailer.js";
+import { sendMail } from "../config/mailer.js";
 import { logger } from "../config/logger.js";
 import {
   orderConfirmationClient,
@@ -81,19 +81,11 @@ async function sendOrderEmails(order) {
   try {
     // Enviar correo de confirmación al cliente
     const clientTemplate = orderConfirmationClient({ order, items: emailItems });
-    await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: order.user.email,
-      ...clientTemplate,
-    });
+    await sendMail({ to: order.user.email, ...clientTemplate });
 
     // Enviar resumen al owner
     const ownerTemplate = orderConfirmationOwner({ order, items: emailItems });
-    await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: process.env.GMAIL_USER,
-      ...ownerTemplate,
-    });
+    await sendMail({ to: process.env.OWNER_EMAIL, ...ownerTemplate });
 
     // Marcar correos como enviados
     await orderRepository.markEmailSent(order.id);
